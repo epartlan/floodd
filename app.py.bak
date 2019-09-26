@@ -1,0 +1,59 @@
+# -*- coding: utf-8 -*-
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+from dash.dependencies import Input, Output
+import plotly.express as px
+import plotly.graph_objects as go
+import pandas as pd
+
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+
+timeless = pd.read_csv('timeless.csv')
+col_options = [dict(label=x, value=x) for x in timeless.columns]
+dimensions = ["value", "color"]
+
+app.layout = html.Div(children=[
+    html.H1(children='Hello Dash'),
+
+    html.Div(children='''
+        Dash: A web application framework for Python.
+    '''),
+
+    html.Div(
+        [
+            html.P([d + ":", dcc.Dropdown(id=d, options=col_options)])
+            for d in dimensions
+        ],
+        style={"width": "25%", "float": "left"}
+    ),
+
+    dcc.Graph(id="graph", style={"width": "75%", "display": "inline-block"}),
+])
+
+@app.callback(Output("graph", "figure"))
+def make_figure():
+    datamap = go.Data([px.scatter_mapbox(timeless, lat="latitude", lon="longitude", hover_data=['count'],
+                        color='count', color_continuous_scale=px.colors.cyclical.IceFire, zoom=5, height=300)])
+    layoutmap = go.Layout(
+        mapbox_style="white-bg",
+        mapbox_layers=[
+            {
+                "below": 'traces',
+                "sourcetype": "raster",
+                "source": [
+                    "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}"
+                ]
+            }
+        ])
+#    fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+
+#    fig.show()
+
+    fig = dict(data=datamap, layout=layoutmap)
+    return fig
+
+if __name__ == '__main__':
+    app.run_server(debug=True)
