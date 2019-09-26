@@ -7,4 +7,5 @@ numpy==1.16.4
 pandas==0.24.2
 pickleshare==0.7.5
 plotly==4.1.1
+statsmodels==0.10.0
 gunicorn
