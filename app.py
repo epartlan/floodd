@@ -36,12 +36,12 @@ app.layout = html.Div(children=[
 
 	html.Div(children='An interactive tool for understanding extents of flood damage in Florida and effectiveness of preventative measures.'),
 
-	dcc.Input(
-		placeholder='',
-		id='address',
-		type='text',
-		value=''
-	),
+	# dcc.Input(
+	# 	placeholder='',
+	# 	id='address',
+	# 	type='text',
+	# 	value=''
+	# ),
 
 	dcc.Graph(
 		id='example-graph',
