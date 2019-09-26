@@ -14,14 +14,14 @@ obs_count = pd.read_csv('obs_count')
 
 zhat_all = pd.Series([])
 for i in range(len(coords.coords)):
-    data = obs_count[coords.coords[i]][:-5]
-    if data.sum() == 0:
-        zhat = pd.DataFrame(pd.Series([0,0,0,0,0,0,0,0]).values.reshape(1,-1))
-        zhat_all = pd.concat([zhat_all, zhat])
-    else:
-        zhat = loaded_model.predict(len(data), len(data)+7)
-        zhat = pd.DataFrame(zhat.values.reshape(1,-1))
-        zhat_all = pd.concat([zhat_all, zhat]) 
+	data = obs_count[coords.coords[i]][:-5]
+	if data.sum() == 0:
+		zhat = pd.DataFrame(pd.Series([0,0,0,0,0,0,0,0]).values.reshape(1,-1))
+		zhat_all = pd.concat([zhat_all, zhat])
+	else:
+		zhat = loaded_model.predict(len(data), len(data)+7)
+		zhat = pd.DataFrame(zhat.values.reshape(1,-1))
+		zhat_all = pd.concat([zhat_all, zhat]) 
 
 
 
@@ -34,16 +34,14 @@ server = app.server
 app.layout = html.Div(children=[
 	html.H1(children='Salty Living: Coastal housing under threat'),
 
-    html.Div(children='An interactive tool for understanding extents of flood damage in Florida and effectiveness of preventative measures.'),
+	html.Div(children='An interactive tool for understanding extents of flood damage in Florida and effectiveness of preventative measures.'),
 
- #    dcc.Input(
-	# 	placeholder='',
-	# 	id='address',
-	# 	type='text',
-	# 	value=''
-	# ),
-
-
+	dcc.Input(
+		placeholder='',
+		id='address',
+		type='text',
+		value=''
+	),
 
 	dcc.Graph(
 		id='example-graph',
@@ -63,12 +61,12 @@ app.layout = html.Div(children=[
 
 	dcc.Dropdown(
 		id='address',
-	    options=[
-	        {'label': '2019', 'value': 5},
-	        {'label': '2020', 'value': 6},
-	        {'label': '2021', 'value': 7}
-	    ],
-	    value=5
+		options=[
+			{'label': '2019', 'value': 5},
+			{'label': '2020', 'value': 6},
+			{'label': '2021', 'value': 7}
+		],
+		value=5
 	),  
 
 	html.Div(
@@ -83,7 +81,7 @@ app.layout = html.Div(children=[
 ])
 
 @app.callback(Output('model-values', 'children'),
-              [Input('address', 'value')])
+			  [Input('address', 'value')])
 def update_metrics(n):
 	return zhat[n].mean()
 
