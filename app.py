@@ -108,15 +108,16 @@ def update_metrics(address, exp_value, home_value):
 	count_preds = count_model.get_prediction(count_test)
 	count_func = count_preds.summary_frame()
 	count = count_func['mean'] # first column is mean count (2 is std err, 3 is ci lower, 4 is ci upper)
-	prob = count/(dt*123876900) # 123876900 square meters in a square with side 0.1 degrees
+	prob = count/(ds*123876900) # 123876900 square meters in a square with side 0.1 degrees
+	prob_30 = 1-((1-prob)**30)
 
 	ct = count # predicted by Poisson2reg
 	xtest = np.array([dt,ct,ds])
 	frac =np.exp(value_model.predict(xtest.reshape(1, -1)))
 
-	premium = (float(exp_value) - prob*frac*float(home_value))/(1 - prob)
+	premium = (float(exp_value) - prob_30*frac*float(home_value))/(1 - prob_30)
 
-	return 'Monthly Premium = ${:0.2f}'.format(round(premium.values[0],2))
+	return 'Annual Premium = ${:0.2f}'.format(round(premium.values[0],2))
 	# return "$"+home_value+"$"
 
 @app.callback(
