@@ -11,3 +11,4 @@ statsmodels==0.10.0
 gunicorn
 geopy
 sklearn
+dash-bootstrap-components
