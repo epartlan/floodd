@@ -12,3 +12,5 @@ gunicorn
 geopy
 sklearn
 dash-bootstrap-components
+fiona
+shapely
