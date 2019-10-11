@@ -14,7 +14,6 @@ from geopy.geocoders import Nominatim
 import shapely.geometry as sgeom
 from shapely.geometry import Point, Polygon
 import fiona
-from scipy.spatial import cKDTree
 
 geolocator = Nominatim(user_agent="surge-protector")
 
@@ -32,18 +31,9 @@ value_model = pickle.load(open(filename, 'rb'))
 # IMPORT NON-USER INPUT DATA
 coord_lookup = pd.read_csv('data/coord_lookup.csv') #contains coordinate [coords], distance [distance], and future housing density [future_density] info
 # coords_NN_tract = pd.read_csv('data/coords_NN_tract_original.csv')
-
 twoftSLR = "data/2ft_SLR.shp"
-coast = fiona.open(twoftSLR)
-
 elevation = pd.read_csv('data/elevation.csv')
 bio16 = pd.read_csv('data/bc_2050_16.csv')
-
-# generate points from 2ft SLR polygon
-nB = list() 
-for feature in coast:
-    nB.extend( list(sgeom.shape(feature["geometry"]).exterior.coords) )
-btree = cKDTree(nB) 
 
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.COSMO])
@@ -201,23 +191,15 @@ def update_metrics(address, home_value, premium):
 	# get coastal proximity with 2ft SLR. better option is to calculate NN with exact coord input
 	# dt = coord_lookup[coord_lookup.coords == coord_input].distance.values[0] #calculated from input location (NN coords or active calc to polygon)
 	point1 =  Point(long_, lat_)
-	nA = (long_,lat_)
-	dt, idx = btree.query(nA, k=1)
-
-
+	coast = fiona.open(twoftSLR)
+	distance = []
 	for feature in coast:
 	    geom = sgeom.shape(feature["geometry"])
-	    if geom.contains(point1):
-	        dt = 0
-
-	# distance = []
-	# for feature in coast:
-	#     geom = sgeom.shape(feature["geometry"])
-	#     distance_between_pts = geom.distance(point1)
-	#     distance.append(distance_between_pts)
-	# dt = min(distance)
-	# if dt == 0:
-	# 	return (html.Div([html.H4("Location expected to be chronically inundated")]))
+	    distance_between_pts = geom.distance(point1)
+	    distance.append(distance_between_pts)
+	dt = max(distance)
+	if dt == 0:
+		return (html.Div([html.H4("Location expected to be chronically inundated")]))
 
 
 	# get future density by looking up from table (future density is calculated as a linear extrapolation from 2013)
