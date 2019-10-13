@@ -2,7 +2,8 @@ import dash
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
+from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
@@ -14,7 +15,8 @@ from geopy.geocoders import Nominatim
 import shapely.geometry as sgeom
 from shapely.geometry import Point, Polygon
 import fiona
-from scipy.spatial import cKDTree
+import rtree
+# from scipy.spatial import cKDTree
 
 geolocator = Nominatim(user_agent="surge-protector")
 
@@ -36,15 +38,17 @@ coord_lookup = pd.read_csv('data/coord_lookup.csv') #contains coordinate [coords
 twoftSLR = "data/2ft_SLR.shp"
 coast = fiona.open(twoftSLR)
 
+# read rtree index from file
+rtree_index = rtree.index.Index('data/2ft_SLR_rtree')
+
 elevation = pd.read_csv('data/elevation.csv')
 bio16 = pd.read_csv('data/bc_2050_16.csv')
 
-# generate points from 2ft SLR polygon
-nB = list() 
-for feature in coast:
-    nB.extend( list(sgeom.shape(feature["geometry"]).exterior.coords) )
-btree = cKDTree(nB) 
-
+# # generate points from 2ft SLR polygon
+# nB = list() 
+# for feature in coast:
+#     nB.extend( list(sgeom.shape(feature["geometry"]).exterior.coords) )
+# btree = cKDTree(nB)
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.COSMO])
 
@@ -131,7 +135,8 @@ app.layout = dbc.Container(children=[
 							dbc.Label("What is your annual flood insurance premium?", html_for="home_value", className="h2"),
 							dbc.Input(type="text", id="premium", placeholder="Enter premium"),
 						]
-					)
+					),
+					dbc.Button('Submit', id='get-results'),
 				],
 				className="col-6",
 			),
@@ -157,15 +162,54 @@ app.layout = dbc.Container(children=[
 	dbc.Container(
 		[
 			html.Div([
-					html.P("Data from FEMA NFIP, US Census, and IPCC", className="lead text-white text-center font-weight-bold"),
-					html.P("Copyright: Erin Partlan, 2019", className="lead text-white text-center font-weight-bold"),
+					html.Div([
+						"Data obtained from publically available sources ",
+						html.A('(FEMA NFIP, ', href='https://www.fema.gov/policy-claim-statistics-flood-insurance', target="_blank", className='text-white'),
+						html.A('US Census, ', href='https://factfinder.census.gov/faces/nav/jsf/pages/index.xhtml', target="_blank", className='text-white'),
+						html.A("IPCC)", href='https://www.worldclim.org/version1', target="_blank",className='text-white'),
+					], className="lead text-white text-center"),
+					html.Div([
+						html.A("© ", href='https://docs.google.com/presentation/d/1VRGywBC0yFgyst1XYeV4mSJQw2xZX9zr7yUKxEomvIw/edit?usp=sharing', target="_blank", className='text-white'), 
+						"2019 Erin Partlan"
+						], className="lead text-white text-center"),
+					html.Div([
+						html.A(
+							html.Img(
+                				src='/assets/github.png',
+				                style={
+				                    'height' : '4%',
+				                    'width' : '4%',
+				                    # 'float' : 'center',
+				                    # 'position' : 'relative',
+				                    # 'padding-top' : 0,
+				                    # 'padding-right' : 0
+
+				                },
+           					), href='https://github.com/epartlan', target="_blank",
+           				),
+           				html.A(
+							html.Img(
+                				src='/assets/linkedin.png',
+				                style={
+				                    'height' : '4%',
+				                    'width' : '4%',
+				                    # 'float' : 'center',
+				                    # 'position' : 'relative',
+				                    # 'padding-top' : 0,
+				                    # 'padding-right' : 0
+
+				                },
+           					), href='https://linkedin.com/in/epartlan', target="_blank",
+           				)
+					], className="text-center")
 				],
 				style={ 'backgroundImage': "url(/assets/background-dark.jpg)",
 						'backgroundRepeat': 'no-repeat',
 						'backgroundPosition': 'bottom',
 						'backgroundSize': 'cover'
-					}
-				)
+				},
+				className='pt-4 pb-2'
+			)
 		],
 		className='app-footer mb-0')
 	
@@ -182,42 +226,53 @@ def coord_check(address):
 		return 'Address not found, choose a nearby location.'
 
 
-
 @app.callback(Output('result', 'children'),
-			   [Input('address', 'value'),
-				Input('home_value', 'value'),
-				Input('premium', 'value')])
-def update_metrics(address, home_value, premium):
+			  [Input('get-results', 'n_clicks')],
+			  [State('address', 'value'),
+			   State('home_value', 'value'),
+			   State('premium', 'value')])
+def update_metrics(number_of_clicks, address, home_value, premium):
+
+	if number_of_clicks is None or number_of_clicks == 0:
+		raise PreventUpdate
+
 	# geolocator = Nominatim(user_agent="surge-protector")
-	if (not address):
+	if (not address) or (not home_value) or (not premium):
 		return '...'
+
 	location = geolocator.geocode(address)
-	if (location == None) or (not home_value) or (not premium):
+	if (location == None):
 		return '...'
-	lat_ = round(location.latitude,1)
-	long_ = round(location.longitude,1)
-	coord_input =  str(lat_)+', '+str(long_)
+	
+	lat_ = round(location.latitude, 1)
+	long_ = round(location.longitude, 1)
+	coord_input =  str(lat_) + ', ' + str(long_)
 
 	# get coastal proximity with 2ft SLR. better option is to calculate NN with exact coord input
 	# dt = coord_lookup[coord_lookup.coords == coord_input].distance.values[0] #calculated from input location (NN coords or active calc to polygon)
-	point1 =  Point(long_, lat_)
-	nA = (long_,lat_)
-	dt, idx = btree.query(nA, k=1)
+	lookup_point =  Point(long_, lat_)
+	
+	# nA = (long_,lat_)
+	# dt, idx = btree.query(nA, k=1)
 
-
-	for feature in coast:
-	    geom = sgeom.shape(feature["geometry"])
-	    if geom.contains(point1):
-	        dt = 0
+	# for feature in coast:
+	#     geom = sgeom.shape(feature["geometry"])
+	#     if geom.contains(lookup_point):
+	#         dt = 0
 
 	# distance = []
 	# for feature in coast:
 	#     geom = sgeom.shape(feature["geometry"])
-	#     distance_between_pts = geom.distance(point1)
+	#     distance_between_pts = geom.distance(lookup_point)
 	#     distance.append(distance_between_pts)
 	# dt = min(distance)
 	# if dt == 0:
 	# 	return (html.Div([html.H4("Location expected to be chronically inundated")]))
+	
+	nearest_geom = list(rtree_index.nearest((long_, lat_)))
+	dt = sgeom.shape(coast[nearest_geom[0]]['geometry']).distance(lookup_point)
+	if dt == 0:
+		return (html.Div([html.H4("Location expected to be chronically inundated")]))
 
 
 	# get future density by looking up from table (future density is calculated as a linear extrapolation from 2013)
@@ -228,36 +283,37 @@ def update_metrics(address, home_value, premium):
 
 	# RUN MODELS
 	intercept = 1
-	count_test = np.array([intercept,dt,ds, el, b16])
+	count_test = np.array([intercept, dt, ds, el, b16])
 	count_preds = count_model.get_prediction(count_test)
 	count_func = count_preds.summary_frame()
 	count = count_func['mean']#/(pp/100.0) # first column is mean count (2 is std err, 3 is ci lower, 4 is ci upper)
 	prob = count/(ds*123876900) # 123876900 square meters in a square with side 0.1 degrees
 
-	if prob.values[0]>=1:
-		prob_30=1
+	if prob.values[0] >= 1:
+		prob_30 = 1
 	else:
 		prob_30 = 1-((1-prob)**30)
 	# return ('ds: '+str(ds)+', pp: '+str(pp)+'count: '+str(count)+', prob: '+str(prob)+', prob_30: '+str(prob_30))
 
 	ct = count # predicted by Poisson2reg
-	xtest = np.array([dt,ct,ds])
+	xtest = np.array([dt, ct, ds])
 	frac =np.exp(value_model.predict(xtest.reshape(1, -1)))
 
-	exp_value = prob_30*frac*float(home_value) - float(premium)*30
+	exp_value = (prob_30*frac*float(home_value)) - (float(premium)*30)
 
-	if exp_value[0]>0:
+	if exp_value[0] > 0:
 		# return "Your expected annual value is: "+'${:0.2f}'.format(round(exp_value.values[0],2))+"A potential payout is likely to exceed your premium payments."
 		return (html.Div([html.H4("The 30-year expected value of your insurance is: "+'${:0.2f}'.format(round(exp_value[0],2))), 
 				html.H4("A potential claims payout is likely to exceed your premium payments.")]))
 
-	if exp_value[0]<=0:
+	# if exp_value[0] <= 0:
+	else:
 		# return "Your expected annual value is: "+'${:0.2f}'.format(round(exp_value.values[0],2))+"A potential payout is NOT likely to exceed your premium payments."
 		return (html.Div([html.H4("The 30-year expected value of your insurance is: "+'${:0.2f}'.format(round(exp_value[0],2))), 
 				html.H4("A potential claims payout is NOT likely to exceed your premium payments.")]))
 
 @app.callback(Output('graph', 'figure'),
-			   [Input('address', 'value')])
+			  [Input('address', 'value')])
 def graph_metrics(address):
 	# geolocator = Nominatim(user_agent="surge-protector")
 	# if (not address):
