@@ -9,7 +9,7 @@ geopy
 gunicorn
 numpy
 pandas
-pickleshare
+pickleshare==0.7.5
 plotly
 rtree
 scipy
